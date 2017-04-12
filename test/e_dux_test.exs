@@ -77,7 +77,12 @@ defmodule EDuxTest do
   end
 end
 
+defmodule Reducer do
+  @callback reduce(any, Map :: map()) :: any
+end
+
 defmodule Test.CounterReducer do
+  @behaviour Reducer
   def reduce(_, %{type: "@@EDux/INIT"}),    do: 0
   def reduce(state, %{type: "INCREMENT"}),  do: state + 1
   def reduce(state, %{type: "DECREMENT"}),  do: state - 1
@@ -85,6 +90,7 @@ defmodule Test.CounterReducer do
 end
 
 defmodule Test.FriendsReducer do
+  @behaviour Reducer
   def reduce(_,     %{type: "@@EDux/INIT"}), do: []
   def reduce(state, %{type: "ADD_FRIEND", friend: friend}), do: state ++ [friend]
   def reduce(state, %{type: "REMOVE_FRIEND", id: id}) do 
