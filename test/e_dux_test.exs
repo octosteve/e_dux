@@ -74,6 +74,16 @@ defmodule EDuxTest do
       assert counterState == 42
       assert friendsState == [%{id: "42", name: "Steven"}]
     end
+
+    test "notifies subscribers of changes" do
+      Process.register self(), :test
+      {:ok, store} = EDux.start_link(%{counter: CounterReducer, friends: FriendsReducer})
+      EDux.subscribe(store, fn () -> 
+        send :test, :called_callback
+      end)
+      EDux.dispatch(store, %{type: "DECREMENT"})
+      assert_receive :called_callback
+    end
   end
 end
 

@@ -1,14 +1,12 @@
 defmodule EDux do
   use GenServer
 
-
-  def start_link(reducerMap, initialState \\ nil) 
-  def start_link(reducerMap, initialState) when is_map(reducerMap) do
-    GenServer.start_link(__MODULE__, [reducerMap, initialState])
+  def start_link(reducer) do
+    GenServer.start_link(__MODULE__, [reducer])
   end
 
-  def start_link(reducerModule, initialState) do
-    GenServer.start_link(__MODULE__, [reducerModule, initialState])
+  def start_link(reducer, initialState) do
+    GenServer.start_link(__MODULE__, [reducer, initialState])
   end
 
   def dispatch(store, action) do
@@ -23,18 +21,19 @@ defmodule EDux do
     GenServer.cast(store, {:subscribe, listener})
   end
 
-  def init([reducerMap = %{}, nil]), do: init([reducerMap, %{}])
-  def init([reducerMap = %{}, initialState]) do
+  def init([reducerMap]) when is_map(reducerMap), do: init([reducerMap, %{}])
+  def init([reducerMap, initialState]) when is_map(reducerMap) and is_map(initialState) do
     reducers = Enum.reduce(reducerMap, %{}, fn ({label, reducerModule}, map) ->
-    {:ok, reducer} = EDux.start_link(reducerModule, Map.get(initialState, label))
-    Map.put(map, label, reducer)
+      {:ok, reducer} = EDux.start_link(reducerModule, Map.get(initialState, label))
+      Map.put(map, label, reducer)
     end)
-    {:ok, %{combined_reducers: reducers}}
+    {:ok, %{combined_reducers: reducers, listeners: []}}
   end
 
-  def init([reducerModule, nil]) do
+  def init([reducerModule, nil]), do: init([reducerModule])
+  def init([reducerModule]) do
     state = apply(reducerModule, :reduce, [nil, %{type: "@@EDux/INIT"}])
-    {:ok, %{reducer: reducerModule, listeners: [], state: state }}
+    init([reducerModule, state])
   end
 
   def init([reducerModule, initialState]) do
@@ -52,8 +51,9 @@ defmodule EDux do
     {:reply, state, state_data}
   end
 
-  def handle_cast({:dispatch, action}, %{combined_reducers: reducers} = state_data) do
+  def handle_cast({:dispatch, action}, %{combined_reducers: reducers, listeners: listeners} = state_data) do
     for r <- Map.values(reducers), do: EDux.dispatch(r, action)
+    for l <- listeners, do: l.()
     {:noreply, state_data}
   end
 
